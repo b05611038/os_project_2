@@ -58,20 +58,29 @@ static struct sockaddr_in addr_cli;//address for slave
 static mm_segment_t old_fs;
 static int addr_len;
 //static  struct mmap_info *mmap_msg; // pointer to the mapped data in this device
+
+// 當page不在memory時
 static int mmap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
+  // 將vm轉為真實的page，並且回傳page參數
   vmf->page = virt_to_page(vma->vm_private_data);
   get_page(vmf->page);
   return 0;
 }
-void mmap_open(struct vm_area_struct *vma)
+
+// 打開vma
+void mmap_open(struct vm_area_struct *vma)  
 {
   /* Do nothing */
 }
+
+// 結束vma
 void mmap_close(struct vm_area_struct *vma)
 {
   /* Do nothing */
 }
+
+// vm operations struct
 static const struct vm_operations_struct my_vm_ops = {
   .open = mmap_open,
   .close = mmap_close,
@@ -80,6 +89,7 @@ static const struct vm_operations_struct my_vm_ops = {
 
 static int my_mmap(struct file *file, struct vm_area_struct *vma)
 {
+  // 建立page
   io_remap_pfn_range(vma,
 		     vma->vm_start,
 		     virt_to_phys(file->private_data) >> PAGE_SHIFT,
@@ -99,7 +109,7 @@ static struct file_operations master_fops = {
   .open = master_open,
   .write = send_msg,
   .release = master_close,
-  .mmap = my_mmap
+  .mmap = my_mmap  // 將自己定義的mmap加入file operations
 };
 
 //device info
@@ -169,13 +179,15 @@ static void __exit master_exit(void)
 
 int master_close(struct inode *inode, struct file *filp)
 {
-  kfree(filp->private_data);
+  // 釋放記憶體
+  kfree(filp->private_data);  
   return 0;
 }
 
 int master_open(struct inode *inode, struct file *filp)
 {
-  filp->private_data = kmalloc(MAP_SIZE, GFP_KERNEL);
+  // 用kmalloc配置記憶體
+  filp->private_data = kmalloc(MAP_SIZE, GFP_KERNEL);  
   return 0;
 }
 
@@ -205,7 +217,8 @@ static long master_ioctl(struct file *file, unsigned int ioctl_num, unsigned lon
     kfree(tmp);
     ret = 0;
     break;
-  case master_IOCTL_SEND:
+  case master_IOCTL_SEND: 
+	//用ksend傳送資料
     //printk("%s\n", file->private_data);
     ksend(sockfd_cli, file->private_data, ioctl_param, 0);
     break;
@@ -217,7 +230,7 @@ static long master_ioctl(struct file *file, unsigned int ioctl_num, unsigned lon
       }
     ret = 0;
     break;
-  default:
+  default: 
     pgd = pgd_offset(current->mm, /*ioctl_param*/139770280394752UL);
     pud = pud_offset(pgd, /*ioctl_param*/139770280394752UL);
     pmd = pmd_offset(pud, /*ioctl_param*/139770280394752UL);
