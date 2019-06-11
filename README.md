@@ -12,4 +12,7 @@ user_program/slave.c:連少甫
 master_device/master.c: 林東逸
 slave_device/slave.c: 張育堂
 
+大家可以參考
+https://linux-kernel-labs.github.io/master/labs/memory_mapping.html
+
 ```

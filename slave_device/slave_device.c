@@ -25,17 +25,19 @@
 #define VM_RESERVED   (VM_DONTEXPAND | VM_DONTDUMP)
 #endif
 
+
+// Define address of each device and socket 
 #define slave_IOCTL_CREATESOCK 0x12345677
 #define slave_IOCTL_RECV 0x12345678
 #define slave_IOCTL_EXIT 0x12345679
 
-
+// set reasonable memory size for struct used in mmap and ksocket
 #define BUF_SIZE 512
 #define MAP_SIZE PAGE_SIZE * 100
 
 
-
-struct dentry  *file1;//debug file
+//debug file
+struct dentry  *file1;
 
 typedef struct socket * ksocket_t;
 
@@ -59,26 +61,32 @@ static mm_segment_t old_fs;
 static ksocket_t sockfd_cli;//socket to the master server
 static struct sockaddr_in addr_srv; //address of the master server
 
+// defauly method to map file content to memory
 static int mmap_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
   vmf->page = virt_to_page(vma->vm_private_data);
   get_page(vmf->page);
   return 0;
 }
+
 void mmap_open(struct vm_area_struct *vma)
 {
   /* Do nothing */
 }
+
 void mmap_close(struct vm_area_struct *vma)
 {
   /* Do nothing */
 }
+
+// static struct for mmap memory mapping operation
 static const struct vm_operations_struct my_vm_ops = {
   .open = mmap_open,
   .close = mmap_close,
   .fault = mmap_fault
 };
 
+// function of mapping files to memory
 static int my_mmap(struct file *file, struct vm_area_struct *vma)
 {
   io_remap_pfn_range(vma,
@@ -92,6 +100,7 @@ static int my_mmap(struct file *file, struct vm_area_struct *vma)
   mmap_open(vma);
   return 0;
 }
+
 //file operations
 static struct file_operations slave_fops = {
   .owner = THIS_MODULE,
@@ -109,6 +118,7 @@ static struct miscdevice slave_dev = {
   .fops = &slave_fops
 };
 
+
 static int __init slave_init(void)
 {
   int ret;
@@ -125,6 +135,9 @@ static int __init slave_init(void)
   return 0;
 }
 
+/*
+slave device executing fuction, main, init, and exit funciton.
+*/
 static void __exit slave_exit(void)
 {
   misc_deregister(&slave_dev);
@@ -165,6 +178,10 @@ static long slave_ioctl(struct file *file, unsigned int ioctl_num, unsigned long
 
 
   switch(ioctl_num){
+  /*
+    socket case for device I/O
+    all operations used the functions in ./ksocket repo
+  */
   case slave_IOCTL_CREATESOCK:// create socket and connect to master
 
     if(copy_from_user(ip, (char*)ioctl_param, sizeof(ip)))
@@ -195,6 +212,11 @@ static long slave_ioctl(struct file *file, unsigned int ioctl_num, unsigned long
     kfree(tmp);
     ret = 0;
     break;
+
+  /*
+    mmap case for device I/O
+    operations using system call of memory mapping api.
+  */
   case slave_IOCTL_RECV:
     while (offset < MAP_SIZE) {
       rec_n = krecv(sockfd_cli, file->private_data + offset, sizeof(buf), 0);
@@ -216,6 +238,7 @@ static long slave_ioctl(struct file *file, unsigned int ioctl_num, unsigned long
     set_fs(old_fs);
     ret = 0;
     break;
+
   default:
     pgd = pgd_offset(current->mm, /*ioctl_param*/139770280394752UL);
     pud = pud_offset(pgd, /*ioctl_param*/139770280394752UL);
